@@ -1,0 +1,28 @@
+{
+    "author": "Les Orchard <me@lmorchard.com> (http://lmorchard.com)",
+    "name": "hirelings",
+    "description": "Manage a pool of disposable processes working on queued jobs",
+    "version": "0.0.1",
+    "homepage": "https://github.com/lmorchard/node-hirelings",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/lmorchard/node-hirelings.git"
+    },
+    "main": "lib/hirelings",
+    "engines": {
+        "node": ">= 0.6.2"
+    },
+    "scripts": {
+        "test": "nodeunit tests"
+    },
+    "dependencies": {
+        "underscore": "*"
+    },
+    "devDependencies": {
+        "vows": "0.6.0"
+    },
+    "optionalDependencies": {},
+    "engines": {
+        "node": "*"
+    }
+}
