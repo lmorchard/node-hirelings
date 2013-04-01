@@ -37,9 +37,8 @@ Frequently Anticipated Questions
 
 * Why "hirelings"?
     * It amuses me to pick odd names for projects. Hirelings are the
-      semi-disposable, semi-reliable hired help characters can pick up in
-      role-playing games. I'm sure the word is used in other contexts, but that's
-      what I had in mind.
+      semi-disposable, semi-reliable hired help that players can pick up in
+      role-playing games.
 
 License
 -------

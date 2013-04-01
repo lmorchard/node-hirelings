@@ -19,7 +19,8 @@
         "underscore": "*"
     },
     "devDependencies": {
-        "vows": "0.6.0"
+        "vows": "0.6.0",
+        "docco": "*"
     },
     "optionalDependencies": {},
     "engines": {

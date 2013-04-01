@@ -51,6 +51,17 @@ suite.addBatch({
             assert.equal(pids.length, 0);
         },
         'that enqueues': {
+            'a successful Job with a callback': {
+                topic: function (leader) {
+                    leader.enqueue({whatsit: 'orly'}, this.callback);
+                },
+                'should result in echoed data to the callback': function (err, result) {
+                    assert.deepEqual(result, {
+                        options: { thing: 'ohai' },
+                        job: {whatsit: 'orly'}
+                    });
+                }
+            },
             'a succesful Job': {
                 topic: function (leader) {
                     return leader.enqueue({whatsit: 'orly'});
@@ -77,6 +88,15 @@ suite.addBatch({
                             }]
                         ]);
                     }
+                }
+            },
+            'a failing Job with a callback': {
+                topic: function (leader) {
+                    leader.enqueue({cause_failure: true}, this.callback);
+                },
+                'should result in an error to the callback': function (err, result) {
+                    assert.equal(result, null);
+                    assert.ok(!!err);
                 }
             },
             'a failing Job': {
