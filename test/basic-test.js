@@ -11,112 +11,77 @@ var suite = vows.describe('Basic hirelings tests');
 
 var job_result_topic = function (job) {
     var self = this;
-    var status = {
-        started: false,
-        progress: [],
-        succeeded: false,
-        failed: false,
-        errored: false,
-        result: null
-    };
-    job.on('start', function () {
-        status.started = true;
-    });
-    job.on('progress', function (data) {
-        status.progress.push(data);
-    });
-    job.on('success', function (data) {
-        status.succeeded = true;
-        status.result = data;
-        self.callback(null, status);
-    });
-    job.on('error', function (data) {
-        status.errored = true;
-        self.callback(null, status);
-    });
-    job.on('failure', function (data) {
-        status.failed = true;
-        self.callback(null, status);
+    var events = [];
+
+    var all_events = ['start', 'progress', 'success', 'error', 'failure'];
+    var final_events = ['success', 'failure'];
+
+    all_events.forEach(function (name) {
+        job.on(name, function (data) {
+            events.push([name, data]);
+            if (-1 != final_events.indexOf(name)) {
+                self.callback(null, events);
+            }
+        });
     });
 };
 
 suite.addBatch({
-    'a Leader': {
+    'a Leader running an echo worker': {
         topic: function () {
             var leader = new hirelings.Leader({
                 concurrency: CONCURRENCY,
-                module: __dirname + '/workers/basic.js',
+                module: __dirname + '/workers/echo.js',
                 options: { thing: 'ohai' }
             });
-            setTimeout(function () { leader.exit(); }, 10000);
+            setTimeout(function () { leader.exit(); }, 20000);
             return leader;
         },
         'can be instantiated': function (leader) {
             assert.ok(leader);
         },
-        'can enqueue a Job': {
-            '(with success) that': {
+        'should start with no HirelingProcess instances': function (leader) {
+            var pids = _.keys(leader.hirelings);
+            assert.equal(pids.length, 0);
+        },
+        'that enqueues': {
+            'a succesful Job': {
                 topic: function (leader) {
-                    return leader.enqueue({
-                        message: 'orly',
-                        cause_error: false,
-                        cause_failure: false
-                    });
+                    return leader.enqueue({whatsit: 'orly'});
                 },
-                'causes a HirelingProcess': {
-                    topic: function (job) {
-                        var pids = _.keys(job.leader.hirelings);
-                        assert.ok(pids.length > 0);
-                        return job.leader.hirelings[pids[0]];
-                    },
-                    'to be created': function (hp) {
-                        assert.ok(hp);
-                        assert.ok(hp.process.pid);
-                    }
+                'should result in at least one HirelingProcess': function (job) {
+                    var leader = job.leader;
+                    var pids = _.keys(leader.hirelings);
+                    assert.ok(pids.length > 0);
+                    var hp = leader.hirelings[pids[0]];
+                    assert.ok(hp);
+                    assert.ok(hp.process.pid);
                 },
-                'can be watched for': {
+                'to which event handlers are attached': {
                     topic: job_result_topic,
-                    'start': function (err, status) {
-                        assert.ok(status.started);
-                    },
-                    'progress': function (err, status) {
-                        assert.deepEqual([1,2,3], status.progress);
-                    },
-                    'success': function (err, status) {
-                        assert.ok(status.succeeded);
-                        var r = status.result;
-                        assert.equal('ohai', r.options.thing);
-                        assert.equal('orly', r.job.message);
+                    'should result in successful events': function (err, result) {
+                        assert.deepEqual(result, [
+                            [ 'start', undefined ],
+                            [ 'progress', 1 ],
+                            [ 'progress', 2 ],
+                            [ 'progress', 3 ],
+                            [ 'success', {
+                                options: { thing: 'ohai' },
+                                job: {whatsit: 'orly'}
+                            }]
+                        ]);
                     }
                 }
             },
-            '(with error) that': {
+            'a failing Job': {
                 topic: function (leader) {
-                    return leader.enqueue({
-                        message: 'ohai',
-                        cause_error: true,
-                        cause_failure: false
-                    });
+                    return leader.enqueue({message: 'ohai', cause_failure: true});
                 },
-                'can be watched for': {
+                'to which event handlers are attached': {
                     topic: job_result_topic,
-                    'error': function (err, status) {
-                        assert.ok(status.errored);
-                    }
-                }
-            },
-            '(with failure) that': {
-                topic: function (leader) {
-                    return leader.enqueue({
-                        message: 'ohai',
-                        cause_error: false,
-                        cause_failure: true
-                    });
-                },
-                'can be watched for': {
-                    topic: job_result_topic,
-                    'failure': function (err, status) {
-                        assert.ok(status.failed);
+                    'should result in a failure event': function (err, result) {
+                        assert.deepEqual(result.pop(), 
+                            ['failure', 'THIS IS A FAILURE']);
                     }
                 }
             }
@@ -125,7 +90,7 @@ suite.addBatch({
 });
 
 suite.addBatch({
-    'a Leader': {
+    'a Leader running a sleep worker': {
         topic: function () {
             var leader = new hirelings.Leader({
                 concurrency: CONCURRENCY,
@@ -135,18 +100,34 @@ suite.addBatch({
             setTimeout(function () { leader.exit(); }, 1000);
             return leader;
         },
-        'can enqueue many Jobs': {
+        'with a Job enqueued and a HirelingProcess later killed': {
+            topic: function (leader) {
+                var job = leader.enqueue({delay: 500});
+                setTimeout(function () {
+                    job.hireling.process.kill();
+                }, 200);
+                return job_result_topic.call(this, job);
+            },
+            'should gracefully result in a failure': function (result) {
+                assert.deepEqual(result.pop(), ['failure', 'exit']);
+            }
+        },
+        'should start with an empty backlog': function (leader) {
+            assert.equal(leader.backlog.length, 0);
+        },
+        'that enqueues more Jobs than available HirelingProcesses': {
             topic: function (leader) {
                 var jobs = [];
-                for (var i=0; i<(CONCURRENCY*2); i++) {
+                for (var i = 0; i < (CONCURRENCY * 2); i++) {
                     jobs.push(leader.enqueue({delay: 5000}));
                 }
                 return jobs;
             },
-            'and more Jobs than concurrent Hirelings should result in a backlog': function (jobs) {
-                assert.ok(jobs[0].leader.backlog.length > 0);
+            'should result in a backlog': function (jobs) {
+                var leader = jobs[0].leader;
+                assert.ok(leader.backlog.length > 0);
             },
-            'and aborting some jobs': {
+            'and aborts some Jobs': {
                 topic: function (jobs) {
                     for (var i=0; i<CONCURRENCY; i++) {
                         jobs.shift().abort();
