@@ -1,3 +1,9 @@
+// TODO: Test new Leader events
+// TODO: Test backlog vs hireling pool
+// TODO: Optionally enforce a max backlog size with immediate job errors
+// TODO: Enforce max job execution time
+// TODO: Enforce max memory usage, use process.memoryUsage() in hireling to
+//       report memory usage to parent?
 var util = require('util'),
     vows = require('vows'),
     assert = require('assert'),
@@ -38,7 +44,7 @@ suite.addBatch({
             return leader;
         },
         'can be instantiated': function (leader) {
-            assert.ok(leader);
+            assert.isObject(leader);
         },
         'should start with no HirelingProcess instances': function (leader) {
             var pids = _.keys(leader.hirelings);

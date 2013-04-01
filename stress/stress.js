@@ -54,18 +54,18 @@ function addWork() {
         if (ex) throw ex;
         var str = buf.toString('base64');
         leader.enqueue(str)
-        .on('failure', function (err) {
-            process.stderr.write("to err is lame!  err: " + util.inspect(err) + "\n");
-            process.exit(9);
-        })
-        .on('success', function(r) {
-            if (r !== str) {
-                process.stderr.write("string not problerly echo'd.  LAME!\n");
-                process.stderr.write("want/got: " + str + "/" + r + "\n");
+            .on('failure', function (err) {
+                process.stderr.write("to err is lame!  err: " + util.inspect(err) + "\n");
                 process.exit(9);
-            }
-            setTimeout(function () { addWork(); }, 300);
-        });
+            })
+            .on('success', function(r) {
+                if (r !== str) {
+                    process.stderr.write("string not problerly echo'd.  LAME!\n");
+                    process.stderr.write("want/got: " + str + "/" + r + "\n");
+                    process.exit(9);
+                }
+                setTimeout(function () { addWork(); }, 1500);
+            });
     });
 }
 
