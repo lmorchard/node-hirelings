@@ -1,6 +1,8 @@
 node-hirelings
 ==============
 
+[![Build Status](https://secure.travis-ci.org/lmorchard/node-hirelings.png)](http://travis-ci.org/lloyd/node-hirelings)
+
 node-hirelings is a lightweight work queue using child processes. 
 
 Use this to perform work that might block the event loop for awhile, possibly
