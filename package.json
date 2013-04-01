@@ -13,7 +13,7 @@
         "node": ">= 0.6.2"
     },
     "scripts": {
-        "test": "nodeunit tests"
+	"test": "vows --spec"
     },
     "dependencies": {
         "underscore": "*"
