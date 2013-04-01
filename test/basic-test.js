@@ -1,4 +1,4 @@
-// TODO: Test new Leader events
+// TODO: Test new pool events
 // TODO: Test backlog vs hireling pool
 // TODO: Optionally enforce a max backlog size with immediate job errors
 // TODO: Enforce max job execution time
@@ -33,27 +33,27 @@ var job_result_topic = function (job) {
 };
 
 suite.addBatch({
-    'a Leader running an echo worker': {
+    'a Pool running an echo worker': {
         topic: function () {
-            var leader = new hirelings.Leader({
+            var pool = new hirelings.Pool({
                 concurrency: CONCURRENCY,
                 module: __dirname + '/workers/echo.js',
                 options: { thing: 'ohai' }
             });
-            setTimeout(function () { leader.exit(); }, 20000);
-            return leader;
+            setTimeout(function () { pool.exit(); }, 20000);
+            return pool;
         },
-        'can be instantiated': function (leader) {
-            assert.isObject(leader);
+        'can be instantiated': function (pool) {
+            assert.isObject(pool);
         },
-        'should start with no HirelingProcess instances': function (leader) {
-            var pids = _.keys(leader.hirelings);
+        'should start with no Process instances': function (pool) {
+            var pids = _.keys(pool.hirelings);
             assert.equal(pids.length, 0);
         },
         'that enqueues': {
             'a successful Job with a callback': {
-                topic: function (leader) {
-                    leader.enqueue({whatsit: 'orly'}, this.callback);
+                topic: function (pool) {
+                    pool.enqueue({whatsit: 'orly'}, this.callback);
                 },
                 'should result in echoed data to the callback': function (err, result) {
                     assert.deepEqual(result, {
@@ -63,14 +63,14 @@ suite.addBatch({
                 }
             },
             'a succesful Job': {
-                topic: function (leader) {
-                    return leader.enqueue({whatsit: 'orly'});
+                topic: function (pool) {
+                    return pool.enqueue({whatsit: 'orly'});
                 },
-                'should result in at least one HirelingProcess': function (job) {
-                    var leader = job.leader;
-                    var pids = _.keys(leader.hirelings);
+                'should result in at least one Process': function (job) {
+                    var pool = job.pool;
+                    var pids = _.keys(pool.hirelings);
                     assert.ok(pids.length > 0);
-                    var hp = leader.hirelings[pids[0]];
+                    var hp = pool.hirelings[pids[0]];
                     assert.ok(hp);
                     assert.ok(hp.process.pid);
                 },
@@ -91,8 +91,8 @@ suite.addBatch({
                 }
             },
             'a failing Job with a callback': {
-                topic: function (leader) {
-                    leader.enqueue({cause_failure: true}, this.callback);
+                topic: function (pool) {
+                    pool.enqueue({cause_failure: true}, this.callback);
                 },
                 'should result in an error to the callback': function (err, result) {
                     assert.equal(result, null);
@@ -100,8 +100,8 @@ suite.addBatch({
                 }
             },
             'a failing Job': {
-                topic: function (leader) {
-                    return leader.enqueue({message: 'ohai', cause_failure: true});
+                topic: function (pool) {
+                    return pool.enqueue({message: 'ohai', cause_failure: true});
                 },
                 'to which event handlers are attached': {
                     topic: job_result_topic,
@@ -116,19 +116,19 @@ suite.addBatch({
 });
 
 suite.addBatch({
-    'a Leader running a sleep worker': {
+    'a Pool running a sleep worker': {
         topic: function () {
-            var leader = new hirelings.Leader({
+            var pool = new hirelings.Pool({
                 concurrency: CONCURRENCY,
                 module: __dirname + '/workers/sleep.js',
                 options: { }
             });
-            setTimeout(function () { leader.exit(); }, 1000);
-            return leader;
+            setTimeout(function () { pool.exit(); }, 1000);
+            return pool;
         },
-        'with a Job enqueued and a HirelingProcess later killed': {
-            topic: function (leader) {
-                var job = leader.enqueue({delay: 500});
+        'with a Job enqueued and a Process later killed': {
+            topic: function (pool) {
+                var job = pool.enqueue({delay: 500});
                 setTimeout(function () {
                     job.hireling.process.kill();
                 }, 200);
@@ -138,20 +138,20 @@ suite.addBatch({
                 assert.deepEqual(result.pop(), ['failure', 'exit']);
             }
         },
-        'should start with an empty backlog': function (leader) {
-            assert.equal(leader.backlog.length, 0);
+        'should start with an empty backlog': function (pool) {
+            assert.equal(pool.backlog.length, 0);
         },
-        'that enqueues more Jobs than available HirelingProcesses': {
-            topic: function (leader) {
+        'that enqueues more Jobs than available Processes': {
+            topic: function (pool) {
                 var jobs = [];
                 for (var i = 0; i < (CONCURRENCY * 2); i++) {
-                    jobs.push(leader.enqueue({delay: 5000}));
+                    jobs.push(pool.enqueue({delay: 5000}));
                 }
                 return jobs;
             },
             'should result in a backlog': function (jobs) {
-                var leader = jobs[0].leader;
-                assert.ok(leader.backlog.length > 0);
+                var pool = jobs[0].pool;
+                assert.ok(pool.backlog.length > 0);
             },
             'and aborts some Jobs': {
                 topic: function (jobs) {
@@ -161,7 +161,7 @@ suite.addBatch({
                     return jobs;
                 },
                 'should result in an empty backlog': function (jobs) {
-                    assert.equal(jobs[0].leader.backlog.length, 0);
+                    assert.equal(jobs[0].pool.backlog.length, 0);
                 }
             }
         }
