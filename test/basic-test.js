@@ -16,6 +16,7 @@ var util = require('util'),
 var MAX_PROCESSES = 4;
 var MAX_JOBS = 6;
 var LOTS_OF_JOBS = ((MAX_PROCESSES * MAX_JOBS) + 10);
+var MAX_KILLS = 5;
 
 var suite = vows.describe('Basic hirelings tests');
 
@@ -44,7 +45,7 @@ suite.addBatch({
                 module: __dirname + '/workers/echo.js',
                 options: { thing: 'ohai' }
             });
-            setTimeout(function () { pool.exit(); }, 20000);
+            setTimeout(function () { pool.exit(); }, 100);
             return pool;
         },
         'can be instantiated': function (pool) {
@@ -148,8 +149,6 @@ suite.addBatch({
             pool.on('drain', function () {
                 self.callback(null, processes, pool, jobs);
             });
-            // Make sure we have an exit point for the pool.
-            setTimeout(function () { pool.exit(); }, 10000);
         },
         'should result in no processes having performed more than 4 jobs': 
                 function (err, processes, pool, jobs) {
@@ -176,7 +175,6 @@ suite.addBatch({
             pool.on('done', function (job) {
                 $this.jobs_ct++;
             });
-            setTimeout(function () { pool.exit(); }, 1000);
             return pool;
         },
         'with a Job enqueued and a Process later killed': {
@@ -199,7 +197,7 @@ suite.addBatch({
             topic: function (pool) {
                 var jobs = [];
                 for (var i = 0; i < (MAX_PROCESSES * 2); i++) {
-                    jobs.push(pool.enqueue({delay: 5000}));
+                    jobs.push(pool.enqueue({delay: 500}));
                 }
                 return jobs;
             },
@@ -230,6 +228,85 @@ suite.addBatch({
                     var stats = jobs[0].pool.getStats();
                     assert.equal(stats.jobs, this.jobs_ct);
                 }
+            }
+        }
+    }
+});
+
+suite.addBatch({
+    'a Pool running an unreliable worker and retries=6': {
+        topic: function () {
+            var self = this;
+            var pool = new hirelings.Pool({
+                max_processes: MAX_PROCESSES,
+                module: __dirname + '/workers/unreliable.js',
+                retries: MAX_KILLS + 1
+            });
+            setTimeout(function () { pool.exit(); }, 1000);
+            return pool;
+        },
+        'with jobs enqueued and killed 5 times each': {
+            topic: function (pool) {
+                var self = this;
+                var results = {};
+
+                // Enqueue a bunch of jobs and prepare the paperwork for
+                // performing the test.
+                for (var i = 0; i < (MAX_PROCESSES * 2); i++) {
+                    (function (name) {
+                        // Prepare to track status for each job.
+                        var result = results[name] = {
+                            kills: 0, exits: 0, retries: 0,
+                            successes: 0, failures: 0
+                        };
+                        // Enqueue the job, with a handler tracking end status.
+                        var job = pool.enqueue(name, function (err, rv) {
+                            if (err) { result.failures++; }
+                            else { result.successes++; }
+                        });
+                        job.on('retry', function () { result.retries++; });
+                    }('JOB ' + i));
+                }
+
+                // Simulate catastrophe by killing workers upon tasking
+                pool.on('task', function (job, worker) {
+                    if (results[job.options].kills++ < MAX_KILLS) {
+                        worker.process.kill();
+                    }
+                });
+
+                /// Count worker exits per job.
+                pool.on('exit', function (worker) {
+                    if (worker.job) {
+                        results[worker.job.options].exits++;
+                    }
+                });
+
+                // When the pool has drained of jobs, the test is done.
+                pool.on('drain', function () {
+                    self.callback(null, results);
+                });
+
+            },
+            'should result in the expected number of exits detected': function (err, results) {
+                _.each(results, function (result) {
+                    assert.equal(result.exits, MAX_KILLS);
+                });
+            },
+            'should result in the expected number of retries': function (err, results) {
+                _.each(results, function (result) {
+                    assert.equal(result.retries, MAX_KILLS);
+                });
+            },
+            'should result in success for all jobs': function (err, results) {
+                _.each(results, function (result) {
+                    assert.equal(result.successes, 1);
+                });
+            },
+            'should result in failure for no jobs': function (err, results) {
+                _.each(results, function (result) {
+                    assert.equal(result.failures, 0);
+                });
             }
         }
     }
