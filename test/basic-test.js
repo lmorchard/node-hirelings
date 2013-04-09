@@ -166,10 +166,15 @@ suite.addBatch({
 suite.addBatch({
     'a Pool running a sleep worker': {
         topic: function () {
+            var $this = this;
             var pool = new hirelings.Pool({
                 max_processes: MAX_PROCESSES,
                 module: __dirname + '/workers/sleep.js',
                 options: { }
+            });
+            this.jobs_ct = 0;
+            pool.on('done', function (job) {
+                $this.jobs_ct++;
             });
             setTimeout(function () { pool.exit(); }, 1000);
             return pool;
@@ -187,7 +192,8 @@ suite.addBatch({
             }
         },
         'should start with an empty backlog': function (pool) {
-            assert.equal(pool.backlog.length, 0);
+            var stats = pool.getStats();
+            assert.equal(stats.backlog, 0);
         },
         'that enqueues more Jobs than available Processes': {
             topic: function (pool) {
@@ -198,8 +204,16 @@ suite.addBatch({
                 return jobs;
             },
             'should result in a backlog': function (jobs) {
-                var pool = jobs[0].pool;
-                assert.ok(pool.backlog.length > 0);
+                var stats = jobs[0].pool.getStats();
+                assert.ok(stats.backlog > 0);
+            },
+            'should not result in more workers than maximum': function (jobs) {
+                var stats = jobs[0].pool.getStats();
+                assert.ok(stats.workers <= MAX_PROCESSES);
+            },
+            'should result in all workers busy': function (jobs) {
+                var stats = jobs[0].pool.getStats();
+                assert.equal(MAX_PROCESSES, stats.busy);
             },
             'and aborts some Jobs': {
                 topic: function (jobs) {
@@ -209,7 +223,12 @@ suite.addBatch({
                     return jobs;
                 },
                 'should result in an empty backlog': function (jobs) {
-                    assert.equal(jobs[0].pool.backlog.length, 0);
+                    var stats = jobs[0].pool.getStats();
+                    assert.equal(stats.backlog, 0);
+                },
+                'should result in expected number of jobs completed': function (jobs) {
+                    var stats = jobs[0].pool.getStats();
+                    assert.equal(stats.jobs, this.jobs_ct);
                 }
             }
         }
