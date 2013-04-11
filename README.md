@@ -12,7 +12,7 @@ Use this to perform work that might:
 * be aborted impolitely;
 * be retried a few times;
 * report progress;
-* measured with statsd or suchlike.
+* be measured with statsd or suchlike.
 
 This is heavily inspired by [lloyd/compute-cluster](https://github.com/lloyd/node-compute-cluster).
 In fact, node-hirelings began life as a great big pull request before I
