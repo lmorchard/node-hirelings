@@ -45,7 +45,7 @@ suite.addBatch({
                 module: __dirname + '/workers/echo.js',
                 options: { thing: 'ohai' }
             });
-            setTimeout(function () { pool.exit(); }, 100);
+            setTimeout(function () { pool.exit(); }, 5000);
             return pool;
         },
         'can be instantiated': function (pool) {
@@ -243,7 +243,7 @@ suite.addBatch({
                 module: __dirname + '/workers/unreliable.js',
                 retries: MAX_KILLS + 1
             });
-            setTimeout(function () { pool.exit(); }, 1000);
+            setTimeout(function () { pool.exit(); }, 5000);
             return pool;
         },
         'with jobs enqueued and killed 5 times each': {
