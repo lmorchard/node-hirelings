@@ -2,7 +2,7 @@
     "author": "Les Orchard <me@lmorchard.com> (http://lmorchard.com)",
     "name": "hirelings",
     "description": "Manage a pool of disposable processes working on queued jobs",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "homepage": "https://github.com/lmorchard/node-hirelings",
     "repository": {
         "type": "git",

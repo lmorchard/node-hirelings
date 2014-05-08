@@ -13,6 +13,7 @@ var util = require('util'),
     _ = require('underscore'),
     hirelings = require('../lib/hirelings');
 
+var POOL_TIMEOUT = 3000;
 var MAX_PROCESSES = 4;
 var MAX_JOBS = 6;
 var LOTS_OF_JOBS = ((MAX_PROCESSES * MAX_JOBS) + 10);
@@ -37,7 +38,7 @@ var job_result_topic = function (job) {
     });
 };
 
-suite.addBatch({
+if (true) suite.addBatch({
     'a Pool running an echo worker': {
         topic: function () {
             var pool = new hirelings.Pool({
@@ -45,7 +46,7 @@ suite.addBatch({
                 module: __dirname + '/workers/echo.js',
                 options: { thing: 'ohai' }
             });
-            setTimeout(function () { pool.exit(); }, 5000);
+            setTimeout(function () { pool.exit(); }, POOL_TIMEOUT);
             return pool;
         },
         'can be instantiated': function (pool) {
@@ -120,7 +121,7 @@ suite.addBatch({
     }
 });
 
-suite.addBatch({
+if (true) suite.addBatch({
     'a Pool with max_job_per_process=4': {
         topic: function () {
             var self = this;
@@ -149,6 +150,7 @@ suite.addBatch({
             pool.on('drain', function () {
                 self.callback(null, processes, pool, jobs);
             });
+            setTimeout(function () { pool.exit(); }, POOL_TIMEOUT);
         },
         'should result in no processes having performed more than 4 jobs': 
                 function (err, processes, pool, jobs) {
@@ -162,7 +164,7 @@ suite.addBatch({
     }
 });
 
-suite.addBatch({
+if (true) suite.addBatch({
     'a Pool running a sleep worker': {
         topic: function () {
             var $this = this;
@@ -175,6 +177,7 @@ suite.addBatch({
             pool.on('done', function (job) {
                 $this.jobs_ct++;
             });
+            setTimeout(function () { pool.exit(); }, POOL_TIMEOUT);
             return pool;
         },
         'with a Job enqueued and a Process later killed': {
@@ -234,7 +237,7 @@ suite.addBatch({
     }
 });
 
-suite.addBatch({
+if (true) suite.addBatch({
     'a Pool running an unreliable worker and retries=6': {
         topic: function () {
             var self = this;
@@ -243,7 +246,7 @@ suite.addBatch({
                 module: __dirname + '/workers/unreliable.js',
                 retries: MAX_KILLS + 1
             });
-            setTimeout(function () { pool.exit(); }, 5000);
+            setTimeout(function () { pool.exit(); }, POOL_TIMEOUT);
             return pool;
         },
         'with jobs enqueued and killed 5 times each': {
@@ -309,6 +312,37 @@ suite.addBatch({
                 _.each(results, function (result) {
                     assert.equal(result.failures, 0);
                 });
+            }
+        }
+    }
+});
+
+var uncaught_count = 0;
+
+if (true) suite.addBatch({
+    'a Pool running an uncaught exception worker': {
+        topic: function () {
+            var pool = new hirelings.Pool({
+                max_processes: MAX_PROCESSES,
+                module: __dirname + '/workers/uncaught.js',
+                // An odd number is important to trigger an old bug.
+                retries: 5 
+            });
+            setTimeout(function () { pool.exit(); }, POOL_TIMEOUT);
+            return pool;
+        },
+        'that enqueues a job': {
+            topic: function (pool) {
+                pool.enqueue({does: 'not matter'}, this.callback);
+            },
+            'should result in a terminal failure': function (err, result) {
+                var err_str = "TypeError: Object #<Object> has no method 'thisMethodDoesNotExist'";
+                assert.ok(err.indexOf(err_str) === 0);
+                assert.ok(err.indexOf('test/workers/uncaught.js') !== -1);
+            },
+            'should result in only one terminal failure': function (err, result) {
+                uncaught_count++;
+                assert.equal(uncaught_count, 1);
             }
         }
     }
