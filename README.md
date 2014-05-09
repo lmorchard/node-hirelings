@@ -46,6 +46,15 @@ Frequently Anticipated Questions
       semi-disposable, semi-reliable hired help that players can pick up in
       role-playing games.
 
+TODO
+----
+
+* Implement the state timeouts!
+
+* Retry spawning workers that fail in initialization
+
+* Promises-based API?
+
 License
 -------
 
