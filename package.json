@@ -2,7 +2,7 @@
     "author": "Les Orchard <me@lmorchard.com> (http://lmorchard.com)",
     "name": "hirelings",
     "description": "Manage a pool of disposable processes working on queued jobs",
-    "version": "0.4.1",
+    "version": "0.4.2",
     "homepage": "https://github.com/lmorchard/node-hirelings",
     "repository": {
         "type": "git",
@@ -16,7 +16,7 @@
 	"test": "vows --spec"
     },
     "dependencies": {
-        "underscore": "*"
+        "underscore": "1.5.0"
     },
     "devDependencies": {
         "vows": "0.7.0",
