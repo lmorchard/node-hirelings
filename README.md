@@ -22,10 +22,8 @@ Installation
 ------------
 
 ````
-$ npm install git://github.com/lmorchard/node-hirelings
+$ npm install node-hirelings
 ````
-
-**TODO:** Needs submission to npm. (*I'm scared, Sarge.*)
 
 Usage
 -----

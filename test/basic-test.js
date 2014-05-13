@@ -22,9 +22,11 @@ var MAX_KILLS = 5;
 
 var suite = vows.describe('Basic processes tests');
 
-process.on('uncaughtException', function (e) {
-    util.debug("EXCEPTION " + e.stack);
-});
+if (DEBUG) {
+    process.on('uncaughtException', function (e) {
+        util.debug("EXCEPTION " + e.stack);
+    });
+}
 
 function poolTopic (worker_name, options) {
     var self = this;
