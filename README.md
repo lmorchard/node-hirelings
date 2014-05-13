@@ -49,9 +49,8 @@ Frequently Anticipated Questions
 TODO
 ----
 
-* Implement the state timeouts!
-
-* Retry spawning workers that fail in initialization
+* Further limit respawning workers that die early. Maybe kill the pool entirely
+  with an error if too many workers are dying in a span of time.
 
 * Promises-based API?
 

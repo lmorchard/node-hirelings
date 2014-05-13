@@ -57,6 +57,8 @@ function poolTopic (worker_name, options) {
                             'WorkerProcess:success',
                             'WorkerProcess:failure'].indexOf(name) !== -1) {
                     out += arguments[0].id + ' -> ' + arguments[1].id;
+                } else if ('WorkerProcess:timeout' == name) {
+                    out += arguments[0].id + ' ' + arguments[1];
                 } else if (['Job:start',
                             'Job:progress',
                             'Job:success',
@@ -110,30 +112,14 @@ if (true) suite.addBatch({
             },
             'should result in options and job data echoed to the callback': function (result) {
                 assert.deepEqual(result, {
-                    options: { thing: 'ohai' },
-                    job: {whatsit: 'orly'}
+                    job: {whatsit: 'orly'},
+                    options: {
+                        thing: 'ohai',
+                        timeout_initializing: 5000,
+                        timeout_working: 10000,
+                        timeout_recovering: 5000
+                    }
                 });
-            }
-        }
-    }
-});
-
-if (true) suite.addBatch({
-    'a Pool running a slow recovery worker': {
-        topic: poolTopic('slow-recovery'),
-        'that enqueues a job': {
-            topic: function (pool) {
-                var result, self = this;
-                pool.enqueue({whoo: 'hoo'}, function (err, result_in) {
-                    result = result_in;
-                });
-                pool.on('idle', function () {
-                    pool.exit();
-                    self.callback(null, result);
-                });
-            },
-            'should result in a successful result': function (result) {
-                assert.deepEqual(result, {whoo: 'hoo'});
             }
         }
     }
@@ -166,7 +152,12 @@ if (true) suite.addBatch({
                             [ 'progress', 2 ],
                             [ 'progress', 3 ],
                             [ 'success', {
-                                options: { thing: 'ohai' },
+                                options: {
+                                    thing: 'ohai',
+                                    timeout_initializing: 5000,
+                                    timeout_working: 10000,
+                                    timeout_recovering: 5000
+                                },
                                 job: {whatsit: 'orly'}
                             }]
                         ]);
@@ -304,7 +295,7 @@ if (true) suite.addBatch({
 });
 
 if (true) suite.addBatch({
-    'another Pool running a sleep worker': {
+    'a Pool running a sleep worker': {
         topic: function () {
             var $this = this;
             var pool = this.pool = poolTopic('sleep', {
@@ -427,6 +418,149 @@ if (true) suite.addBatch({
             'should result in only one terminal failure': function (err, result) {
                 uncaught_count++;
                 assert.equal(uncaught_count, 1);
+            }
+        }
+    }
+});
+
+function enqueueThenWaitIdleTopic (pool) {
+    var result, err, self = this;
+    pool.enqueue({whoo: 'hoo'}, function (err_in, result_in) {
+        err = err_in;
+        result = result_in;
+    });
+    pool.on('idle', function () {
+        pool.exit();
+        self.callback(null, {err: err, result: result});
+    });
+}
+
+function countTimeoutEventsTopic (pool) {
+    var stats = this.stats = {
+        spawn: 0,
+        exit: 0,
+        timeout: {}
+    };
+    pool.on('spawn', function () { stats.spawn++; });
+    pool.on('WorkerProcess:exit', function () { stats.exit++; });
+    pool.on('WorkerProcess:timeout', function (_, name) {
+        stats.timeout[name] = true;
+    });
+    return pool;
+}
+
+if (true) suite.addBatch({
+    'a Pool running a slow worker with timeout_working=5000': {
+        topic: poolTopic('slow', {
+            timeout_working: 5000
+        }),
+        'that enqueues a job': {
+            topic: enqueueThenWaitIdleTopic,
+            'should result in a success': function (r) {
+                assert.deepEqual(r.result, {whoo: 'hoo'});
+            }
+        }
+    },
+    'a Pool running a slow worker with timeout_working=50': {
+        topic: poolTopic('slow', {
+            timeout_working: 50
+        }),
+        'that enqueues a job': {
+            topic: enqueueThenWaitIdleTopic,
+            'should result in a failure result': function (r) {
+                assert.deepEqual(r.err, 'exit');
+            }
+        }
+    },
+    'a Pool running a slow worker with timeout_recovering=5000': {
+        topic: poolTopic('slow', {
+            timeout_recovering: 5000
+        }),
+        'with listeners for timeouts': {
+            topic: countTimeoutEventsTopic,
+            'that enqueues a job': {
+                topic: enqueueThenWaitIdleTopic,
+                'should result in a success': function (r) {
+                    assert.deepEqual(r.result, {whoo: 'hoo'});
+                },
+                'should result in no timeout while recovering': function () {
+                    assert.deepEqual(this.stats, {
+                        spawn: 1, exit: 0, timeout: {}
+                    });
+                }
+            }
+        }
+    },
+    'a Pool running a slow worker with timeout_recovering=50': {
+        topic: poolTopic('slow', {
+            timeout_recovering: 50
+        }),
+        'with listeners for timeouts': {
+            topic: countTimeoutEventsTopic,
+            'that enqueues a job': {
+                topic: enqueueThenWaitIdleTopic,
+                'should result in a success': function (r) {
+                    assert.deepEqual(r.result, {whoo: 'hoo'});
+                },
+                'should result in a timeout while recovering': function () {
+                    assert.deepEqual(this.stats, {
+                        spawn: 2, exit: 1, timeout: { recovering: true }
+                    });
+                }
+            }
+        }
+    },
+    'a Pool running a slow worker with timeout_initializing=5000': {
+        topic: poolTopic('slow', {
+            timeout_initializing: 5000
+        }),
+        'with listeners for timeouts': {
+            topic: countTimeoutEventsTopic,
+            'that enqueues a job': {
+                topic: enqueueThenWaitIdleTopic,
+                'should result in a success': function (r) {
+                    assert.deepEqual(r.result, {whoo: 'hoo'});
+                },
+                'should result in no timeout while initializing': function () {
+                    assert.ok(!('initializing' in this.stats.timeout));
+                },
+                'should result in no worker respawns': function () {
+                    assert.ok(this.stats.spawn === 1);
+                    assert.ok(this.stats.exit === 0);
+                }
+            }
+        }
+    },
+    'a Pool running a slow worker with timeout_initializing=50': {
+        topic: poolTopic('slow', {
+            timeout_initializing: 50,
+            respawn_wait: 100
+        }),
+        'with listeners for timeouts': {
+            topic: countTimeoutEventsTopic,
+            'that enqueues a job with an early exit to break the respawn loop': {
+                topic: function (pool) {
+                    var result, err, self = this;
+                    pool.enqueue({whoo: 'hoo'}, function (err_in, result_in) {
+                        err = err_in;
+                        result = result_in;
+                    });
+                    setTimeout(function () {
+                        pool.exit();
+                        self.callback(null, {err: err, result: result});
+                    }, 500);
+                },
+                'should yield no result': function (r) {
+                    assert.ok(!r.result);
+                    assert.ok(!r.err);
+                },
+                'should result in a timeout while initializing': function () {
+                    assert.ok('initializing' in this.stats.timeout);
+                },
+                'should result in multiple worker respawns': function () {
+                    assert.ok(this.stats.spawn > 1);
+                    assert.ok(this.stats.exit > 1);
+                }
             }
         }
     }

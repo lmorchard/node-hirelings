@@ -6,7 +6,7 @@ var self = new hirelings.Worker();
 self.on('init', function (config) {
     setTimeout(function () {
         self.ready();
-    }, 100);
+    }, 200);
 });
 
 self.on('job', function (job) {
@@ -16,7 +16,7 @@ self.on('job', function (job) {
             self.success(job);
             setTimeout(function () {
                 self.ready();
-            }, 100);
-        }, 100);
-    }, 100);
+            }, 200);
+        }, 200);
+    }, 200);
 });
