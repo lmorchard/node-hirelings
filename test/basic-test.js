@@ -14,7 +14,7 @@ var util = require('util'),
     hirelings = require('../lib/hirelings');
 
 var DEBUG = false;
-var POOL_TIMEOUT = 10000;
+var POOL_TIMEOUT = 30000;
 var MAX_PROCESSES = 4;
 var MAX_JOBS = 4;
 var LOTS_OF_JOBS = ((MAX_PROCESSES * MAX_JOBS) + 5);
@@ -431,7 +431,7 @@ function enqueueThenWaitIdleTopic (pool) {
         err = err_in;
         result = result_in;
     });
-    pool.on('idle', function () {
+    pool.once('idle', function () {
         pool.exit();
         self.callback(null, {err: err, result: result});
     });
@@ -451,6 +451,8 @@ function countTimeoutEventsTopic (pool) {
     return pool;
 }
 
+var timeout_ct = 0;
+
 if (true) suite.addBatch({
     'a Pool running a slow worker with timeout_working=5000': {
         topic: poolTopic('slow', {
@@ -463,9 +465,9 @@ if (true) suite.addBatch({
             }
         }
     },
-    'a Pool running a slow worker with timeout_working=50': {
+    'a Pool running a slow worker with timeout_working=150': {
         topic: poolTopic('slow', {
-            timeout_working: 50
+            timeout_working: 150
         }),
         'that enqueues a job': {
             topic: enqueueThenWaitIdleTopic,
@@ -474,15 +476,18 @@ if (true) suite.addBatch({
             }
         }
     },
-    'a Pool running a slow worker with timeout_working=50 and retries=3': {
+    'a Pool running a slow worker with timeout_working=150 and retries=2': {
         topic: poolTopic('slow', {
-            timeout_working: 50,
-            retries: 3
+            timeout_working: 150,
+            retries: 2
         }),
         'that enqueues a job': {
             topic: enqueueThenWaitIdleTopic,
             'should result in a failure result': function (r) {
                 assert.deepEqual(r.err, 'timeout');
+            },
+            'should result in only one failure result': function (r) {
+                assert.ok(++timeout_ct == 1);
             }
         }
     }
@@ -508,9 +513,9 @@ if (true) suite.addBatch({
             }
         }
     },
-    'a Pool running a slow worker with timeout_recovering=50': {
+    'a Pool running a slow worker with timeout_recovering=150': {
         topic: poolTopic('slow', {
-            timeout_recovering: 50
+            timeout_recovering: 150
         }),
         'with listeners for timeouts': {
             topic: countTimeoutEventsTopic,
@@ -551,9 +556,9 @@ if (true) suite.addBatch({
             }
         }
     },
-    'a Pool running a slow worker with timeout_initializing=50': {
+    'a Pool running a slow worker with timeout_initializing=150': {
         topic: poolTopic('slow', {
-            timeout_initializing: 50,
+            timeout_initializing: 150,
             respawn_wait: 100
         }),
         'with listeners for timeouts': {
@@ -568,7 +573,7 @@ if (true) suite.addBatch({
                     setTimeout(function () {
                         pool.exit();
                         self.callback(null, {err: err, result: result});
-                    }, 500);
+                    }, 1500);
                 },
                 'should yield no result': function (r) {
                     assert.ok(!r.result);
