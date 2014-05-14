@@ -470,10 +470,25 @@ if (true) suite.addBatch({
         'that enqueues a job': {
             topic: enqueueThenWaitIdleTopic,
             'should result in a failure result': function (r) {
-                assert.deepEqual(r.err, 'exit');
+                assert.deepEqual(r.err, 'timeout');
             }
         }
     },
+    'a Pool running a slow worker with timeout_working=50 and retries=3': {
+        topic: poolTopic('slow', {
+            timeout_working: 50,
+            retries: 3
+        }),
+        'that enqueues a job': {
+            topic: enqueueThenWaitIdleTopic,
+            'should result in a failure result': function (r) {
+                assert.deepEqual(r.err, 'timeout');
+            }
+        }
+    }
+});
+
+if (true) suite.addBatch({
     'a Pool running a slow worker with timeout_recovering=5000': {
         topic: poolTopic('slow', {
             timeout_recovering: 5000
@@ -511,7 +526,10 @@ if (true) suite.addBatch({
                 }
             }
         }
-    },
+    }
+});
+
+if (true) suite.addBatch({
     'a Pool running a slow worker with timeout_initializing=5000': {
         topic: poolTopic('slow', {
             timeout_initializing: 5000
